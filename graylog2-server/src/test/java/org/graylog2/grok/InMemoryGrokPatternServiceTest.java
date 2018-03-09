@@ -130,4 +130,13 @@ public class InMemoryGrokPatternServiceTest {
         assertThat(service.loadAll()).isEmpty();
     }
 
+    @Test
+    public void match() throws Exception {
+        final String name = "IP";
+        final String sampleData = "1.2.3.4";
+        final String expectedResult = "{\"IP\":\"1.2.3.4\"}";
+        GrokPattern grokPattern = GrokPattern.create(name, "\\d.\\d.\\d.\\d");
+        final String result = service.match(grokPattern, sampleData);
+        assertThat(result).isEqualTo(expectedResult);
+    }
 }

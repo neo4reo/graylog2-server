@@ -31,8 +31,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class InMemoryGrokPatternService implements GrokPatternService {
     private static final Logger LOG = LoggerFactory.getLogger(InMemoryGrokPatternService.class);
@@ -58,8 +59,12 @@ public class InMemoryGrokPatternService implements GrokPatternService {
 
     @Override
     public GrokPattern save(GrokPattern pattern) throws ValidationException {
-        if (!validate(pattern)) {
-            throw new ValidationException("Pattern named " + pattern.name() + " is not valid!");
+        try {
+            if (!validate(pattern)) {
+                throw new ValidationException("Pattern " + pattern.name() + " invalid.");
+            }
+        } catch (GrokException e) {
+            throw new ValidationException("Invalid pattern " + pattern + "\n" + e.getMessage());
         }
         GrokPattern toSave;
         if (pattern.id() == null) {
@@ -89,8 +94,12 @@ public class InMemoryGrokPatternService implements GrokPatternService {
     public List<GrokPattern> saveAll(Collection<GrokPattern> patterns,
                                      boolean replace) throws ValidationException {
         for (GrokPattern pattern : patterns) {
-            if (!validate(pattern)) {
-                throw new ValidationException("Pattern " + pattern.name() + " invalid.");
+            try {
+                if (!validate(pattern)) {
+                    throw new ValidationException("Pattern " + pattern.name() + " invalid.");
+                }
+            } catch (GrokException e) {
+                throw new ValidationException("Invalid pattern " + pattern + "\n" + e.getMessage());
             }
         }
         if (replace) {
@@ -103,19 +112,26 @@ public class InMemoryGrokPatternService implements GrokPatternService {
     }
 
     @Override
-    public boolean validate(GrokPattern pattern) {
-        final boolean fieldsMissing = !(Strings.isNullOrEmpty(pattern.name()) || Strings.isNullOrEmpty(pattern.pattern()));
-        try {
+    public String match(GrokPattern pattern, String sampleData) throws GrokException {
+        final Set<GrokPattern> patterns = loadAll();
+        final Grok grok = new Grok();
+        grok.addPattern(pattern.name(), pattern.pattern());
+        for(GrokPattern storedPattern : patterns) {
+            grok.addPattern(storedPattern.name(), storedPattern.pattern());
+        }
+        grok.compile("%{" + pattern.name() + "}");
+        return grok.capture(sampleData);
+    }
+
+    @Override
+    public boolean validate(GrokPattern pattern) throws GrokException {
+        checkNotNull(pattern, "A pattern must be given");
+        final boolean fieldsMissing = Strings.isNullOrEmpty(pattern.name()) || Strings.isNullOrEmpty(pattern.pattern());
             final Grok grok = new Grok();
             grok.addPattern(pattern.name(), pattern.pattern());
             grok.compile("%{" + pattern.name() + "}");
-        } catch (GrokException ignored) {
-            // this only checks for null or empty again.
-        } catch (PatternSyntaxException e) {
-            LOG.warn("Invalid regular expression syntax for '" + pattern.name() + "' with pattern " + pattern.pattern(), e);
-            return false;
-        }
-        return fieldsMissing;    }
+        return !fieldsMissing;
+    }
 
     @Override
     public int delete(String patternId) {

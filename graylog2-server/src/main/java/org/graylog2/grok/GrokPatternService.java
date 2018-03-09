@@ -16,6 +16,7 @@
  */
 package org.graylog2.grok;
 
+import oi.thekraken.grok.api.exception.GrokException;
 import org.graylog2.database.NotFoundException;
 import org.graylog2.plugin.database.ValidationException;
 
@@ -32,7 +33,9 @@ public interface GrokPatternService {
 
     List<GrokPattern> saveAll(Collection<GrokPattern> patterns, boolean replace) throws ValidationException;
 
-    boolean validate(GrokPattern pattern);
+    String match(GrokPattern pattern, String sampleData) throws GrokException;
+
+    boolean validate(GrokPattern pattern) throws GrokException;
 
     int delete(String patternId);
 

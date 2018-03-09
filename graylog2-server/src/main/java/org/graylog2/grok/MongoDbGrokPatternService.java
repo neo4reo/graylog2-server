@@ -38,7 +38,8 @@ import javax.inject.Inject;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.PatternSyntaxException;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class MongoDbGrokPatternService implements GrokPatternService {
     public static final String GROK_PATTERNS = "grok_patterns";
@@ -75,8 +76,12 @@ public class MongoDbGrokPatternService implements GrokPatternService {
 
     @Override
     public GrokPattern save(GrokPattern pattern) throws ValidationException {
-        if (!validate(pattern)) {
-            throw new ValidationException("Invalid pattern " + pattern);
+        try {
+            if (!validate(pattern)) {
+                throw new ValidationException("Invalid pattern " + pattern);
+            }
+        } catch (GrokException e) {
+            throw new ValidationException("Invalid pattern " + pattern + "\n" + e.getMessage());
         }
         final WriteResult<GrokPattern, ObjectId> result = dbCollection.save(pattern);
         return result.getSavedObject();
@@ -98,19 +103,26 @@ public class MongoDbGrokPatternService implements GrokPatternService {
     }
 
     @Override
-    public boolean validate(GrokPattern pattern) {
-        final boolean fieldsMissing = !(Strings.isNullOrEmpty(pattern.name()) || Strings.isNullOrEmpty(pattern.pattern()));
-        try {
-            final Grok grok = new Grok();
-            grok.addPattern(pattern.name(), pattern.pattern());
-            grok.compile("%{" + pattern.name() + "}");
-        } catch (GrokException ignored) {
-            // this only checks for null or empty again.
-        } catch (PatternSyntaxException e) {
-            log.warn("Invalid regular expression syntax for '" + pattern.name() + "' with pattern " + pattern.pattern(), e);
-            return false;
+    public String match(GrokPattern pattern, String sampleData) throws GrokException {
+        final Set<GrokPattern> patterns = loadAll();
+        final Grok grok = new Grok();
+        grok.addPattern(pattern.name(), pattern.pattern());
+        for(GrokPattern storedPattern : patterns) {
+            grok.addPattern(storedPattern.name(), storedPattern.pattern());
         }
-        return fieldsMissing;
+        grok.compile("%{" + pattern.name() + "}");
+        return grok.capture(sampleData);
+    }
+
+
+    @Override
+    public boolean validate(GrokPattern pattern) throws GrokException {
+        checkNotNull(pattern, "A pattern must be given");
+        final boolean fieldsMissing = Strings.isNullOrEmpty(pattern.name()) || Strings.isNullOrEmpty(pattern.pattern());
+        final Grok grok = new Grok();
+        grok.addPattern(pattern.name(), pattern.pattern());
+        grok.compile("%{" + pattern.name() + "}");
+        return !fieldsMissing;
     }
 
     @Override
