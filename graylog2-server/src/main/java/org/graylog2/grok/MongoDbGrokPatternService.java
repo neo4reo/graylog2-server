@@ -107,10 +107,10 @@ public class MongoDbGrokPatternService implements GrokPatternService {
     public String match(GrokPattern pattern, String sampleData) throws GrokException {
         final Set<GrokPattern> patterns = loadAll();
         final Grok grok = new Grok();
-        grok.addPattern(pattern.name(), pattern.pattern());
         for(GrokPattern storedPattern : patterns) {
             grok.addPattern(storedPattern.name(), storedPattern.pattern());
         }
+        grok.addPattern(pattern.name(), pattern.pattern());
         grok.compile("%{" + pattern.name() + "}");
         return grok.capture(sampleData);
     }
