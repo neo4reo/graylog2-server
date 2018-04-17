@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -63,7 +64,7 @@ public class InMemoryGrokPatternService implements GrokPatternService {
             if (!validate(pattern)) {
                 throw new ValidationException("Pattern " + pattern.name() + " invalid.");
             }
-        } catch (GrokException e) {
+        } catch (GrokException | PatternSyntaxException e) {
             throw new ValidationException("Invalid pattern " + pattern + "\n" + e.getMessage());
         }
         GrokPattern toSave;
@@ -98,7 +99,7 @@ public class InMemoryGrokPatternService implements GrokPatternService {
                 if (!validate(pattern)) {
                     throw new ValidationException("Pattern " + pattern.name() + " invalid.");
                 }
-            } catch (GrokException e) {
+            } catch (GrokException | PatternSyntaxException e) {
                 throw new ValidationException("Invalid pattern " + pattern + "\n" + e.getMessage());
             }
         }
